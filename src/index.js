@@ -23,23 +23,35 @@ const methods = {
     // to be implemented...
     const query = `
     {
-  allFactSheets(filter: {facetFilters: [{facetKey: "FactSheetTypes", keys: ["ITComponent"]}, {facetKey: "hierarchyLevel", keys: ["1"]}]}) {
-    edges {
-      node {
-        ... on ITComponent {
-          name
-          relITComponentToApplication {
-            edges {
-              node {
-                costTotalAnnual
+      allFactSheets(filter: {facetFilters: [{facetKey: "FactSheetTypes", keys: ["UserGroup"]}, {facetKey: "hierarchyLevel", keys: ["1"]}]}) {
+        edges {
+          node {
+            name
+            ... on UserGroup {
+              relUserGroupToApplication {
+                edges {
+                  node {
+                    factSheet {
+                      name
+                      type
+                      ... on Application {
+                        relApplicationToITComponent {
+                          edges{
+                            node{
+                              costTotalAnnual
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }
         }
       }
-    }
-  }
-}`
+    }`
     lx.showSpinner()
     try {
       this.response = await lx.executeGraphQL(query)
@@ -55,22 +67,53 @@ const methods = {
     this
     this.rows = this.response.allFactSheets.edges // <- this is an Array
       // and map each edge into its node attribute
+      
       .map(edge => {
-        let { name, relITComponentToApplication } = edge.node
-        var cost = relITComponentToApplication.edges
+
+        let { name, relUserGroupToApplication } = edge.node
+
+        var apps = relUserGroupToApplication.edges
           .map(edge => {
-            let { costTotalAnnual } = edge.node
-            return costTotalAnnual
-          }).reduce((a, b) => a + b, 0)
-        return {name, cost}
+            return {Application: edge.node.factSheet.name, TotalCost: edge.node.factSheet.relApplicationToITComponent.edges
+              .map(elem => {
+                return elem.node.costTotalAnnual
+              }).reduce((a, b) => a + b, 0) }
+          })
+
+        var test = relUserGroupToApplication.edges
+          .map(edge => {
+            return edge.node.factSheet.relApplicationToITComponent.edges.f
+              
+          })
+        
+        var test1 = "$"+ apps
+          .map(obj => {
+            return obj.TotalCost
+          }).reduce((a, b) => a + b, 0).toString() 
+          
+        var final = apps
+          .map(obj => {
+            var string =  `${obj.Application} : $${obj.TotalCost} \n`
+            return string
+          }).join('')
+          /*.map(edge => {
+            let { id, factSheet } = edge.node
+            return factSheet.relApplicationtoITComponent.edges
+              .map(edge => {
+                let { costTotalAnnual } = edge.node
+                return costTotalAnnual
+              })
+            }).reduce((a, b) => a + b, 0)*/
+        return { "Application : Cost": final, "User Group": name, "Total Cost": test1, Applications: apps}
       }) // <- this is the Array map operator applied to it
+      
       this.computeTableColumns()
   },
   computeTableColumns () {
     // to be implemented
-    const  columnKeys = ['name', 'cost']
+    const  columnKeys = ['User Group', 'Application : Cost','Total Cost']
     this.columns = columnKeys
-      .map(key  => ({ key, label:  lx.translateField("cost", key) }))
+      .map(key  => ({ key, label:  lx.translateField("", key) }))
   }
 }
 
